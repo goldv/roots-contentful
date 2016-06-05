@@ -6,6 +6,8 @@ contentful  = require 'contentful'
 pluralize   = require 'pluralize'
 RootsUtil   = require 'roots-util'
 querystring = require 'querystring'
+request     = require 'request'
+fs          = require 'fs'
 
 errors =
   no_token: 'Missing required options for roots-contentful. Please ensure
@@ -33,6 +35,7 @@ module.exports = (opts) ->
     accessToken: opts.access_token
     space: opts.space_id
 
+
   class RootsContentful
     constructor: (@roots) ->
       @util = new RootsUtil(@roots)
@@ -41,6 +44,9 @@ module.exports = (opts) ->
       @roots.config.locals.asset = asset_view_helper
 
     setup: ->
+      configure_assets(opts.assets)
+      get_all_assets(opts.assets).then(download_assets).catch( (e) -> console.error(e))
+
       configure_content(opts.content_types).with(@)
         .then(get_all_content)
         .tap(set_urls)
@@ -69,6 +75,13 @@ module.exports = (opts) ->
               t.path ?= (e) -> "#{t.name}/#{S(e[res.displayField]).slugify().s}"
             return t
         return W.resolve(t)
+
+    configure_assets = (config) ->
+      console.log("creating " + config.output)
+      if !fs.existsSync(config.output)
+        fs.mkdirSync(config.output)
+
+
 
     ###*
      * Reconfigures content types set in app.coffee using an object instead of
@@ -108,6 +121,28 @@ module.exports = (opts) ->
         client.entries(
           _.merge(type.filters, content_type: type.id, include: 10)
         )
+      )
+
+    ###*
+     * Fetch all assets
+     * @return {Promise} - returns response from Contentful API
+    ###
+
+    get_all_assets = () ->
+      W(
+        client.assets()
+      )
+
+    download_assets = (assets) ->
+      W.map(assets, download_asset)
+
+    download_asset = (asset) ->
+      parts = asset.fields.file.fileName.split('.')
+      suffix = parts[parts.length - 1]
+      fileName = asset.sys.id + "." + suffix
+      W(
+        request.get('http:' + asset.fields.file.url)
+          .pipe(fs.createWriteStream(fileName))
       )
 
     ###*
