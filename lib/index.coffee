@@ -44,8 +44,9 @@ module.exports = (opts) ->
       @roots.config.locals.asset = asset_view_helper
 
     setup: ->
-      configure_assets(opts.assets)
-      get_all_assets(opts.assets).then(download_assets).catch( (e) -> console.error(e))
+      console.log("setting up")
+      current_assets(opts.assets.output).then( (a) -> console.log(a))
+      # get_all_assets(opts.assets).then(download_assets).catch( (e) -> console.error(e))
 
       configure_content(opts.content_types).with(@)
         .then(get_all_content)
@@ -80,6 +81,8 @@ module.exports = (opts) ->
       console.log("creating " + config.output)
       if !fs.existsSync(config.output)
         fs.mkdirSync(config.output)
+
+      current_assets(config.output)
 
 
 
@@ -128,10 +131,13 @@ module.exports = (opts) ->
      * @return {Promise} - returns response from Contentful API
     ###
 
-    get_all_assets = () ->
+    fetch_all_assets = () ->
       W(
         client.assets()
       )
+
+    get_all_assets = (assets) ->
+
 
     download_assets = (assets) ->
       W.map(assets, download_asset)
@@ -144,6 +150,13 @@ module.exports = (opts) ->
         request.get('http:' + asset.fields.file.url)
           .pipe(fs.createWriteStream(fileName))
       )
+
+    current_assets = (dir) ->
+      if !fs.existsSync(dir)
+        fs.mkdirSync(dir)
+
+      W( fs.readdirSync(dir) )
+
 
     ###*
      * Formats raw response from Contentful
